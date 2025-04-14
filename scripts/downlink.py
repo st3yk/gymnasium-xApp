@@ -1,13 +1,15 @@
 #!/bin/env python3
 import subprocess
 import time
+import xmlrpc.client
 
 def start_iperf(namespace: str, ue_ip: str):
     # Runs an iperf server inside a given network namespace (ue1, ue2, ue3)
     command = [
         "sudo", "ip", "netns", "exec", namespace, "iperf",
         "-s", "-u",          # UDP server type
-        "-B", ue_ip          # UE IP bind
+        "-B", ue_ip,          # UE IP bind
+        "-1"
     ]
     return subprocess.Popen(
         command,
@@ -26,14 +28,20 @@ def generate_traffic(ue_ip: str, bandwidth: str, duration: int):
             stdout=subprocess.PIPE
         )
 
-
 def main():
+    try:
+        grc_proxy = xmlrpc.client.ServerProxy("http://localhost:8000")
+        print(f"Successfully connected to GNU Radio XMLRPC server")
+    except Exception as e:
+        print(f"Error connecting to GNU Radio XMLRPC server: {e}")
+        exit()
+
     ues = {
-        "ue1": {"ip": "10.45.1.2", "bandwidth": "10M"},
-        "ue2": {"ip": "10.45.1.3", "bandwidth": "10M"},
-        "ue3": {"ip": "10.45.1.4", "bandwidth": "10M"}
+        "ue1": {"ip": "10.45.1.2", "bandwidth": "3M"},
+        "ue2": {"ip": "10.45.1.3", "bandwidth": "3M"},
+        "ue3": {"ip": "10.45.1.4", "bandwidth": "3M"}
     }
-    duration = 600  # Test duration in seconds
+    duration = int(input("Set duration in seconds: "))  # Test duration in seconds
     
     print(f"Configuration {ues}, duration: {duration} seconds")
     
@@ -42,16 +50,21 @@ def main():
     time.sleep(1)  # Initial delay
     # Start iperf clients for each UE
     clients = {ue: generate_traffic(data["ip"], data["bandwidth"], duration) for ue, data in ues.items()}
-    time.sleep(duration + 10)  # Allow traffic to flow before collecting output
+    for i in range(int(duration / 20)):
+        grc_proxy.set_ue1_path_loss_db(float(10.0 + i%4 * 5.0))
+        print(f"UE1 path loss: {grc_proxy.get_ue1_path_loss_db()}")
+        time.sleep(20)
+    print("ehh")
     
     # Retrieve and print results
     for ue, process in clients.items():
         out, _ = process.communicate()
-        print(f"{ue} output:\n{out.decode()}")
+        print(f"client {ue} output:\n{out.decode()}")
         
     for ue, process in servers.items():
-        out, _ = process.communicate()
-        print(f"{ue} output:\n{out.decode()}")
+        process.kill()
+        out, _ = process.communicate(timeout=1)
+        print(f"server {ue} output:\n{out.decode()}")
 
 if __name__ == "__main__":
     main()
