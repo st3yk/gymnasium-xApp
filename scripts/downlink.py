@@ -20,7 +20,7 @@ def start_iperf(namespace: str, ue_ip: str):
 def generate_traffic(ue_ip: str, bandwidth: str, duration: int):
     command = [
         "iperf", "-c", ue_ip,
-        "-R", "-u", "-b", bandwidth,
+        "-u", "-b", bandwidth,
         "-i", "1", "-t", str(duration)
     ]
     if not bandwidth[0] == "0":
