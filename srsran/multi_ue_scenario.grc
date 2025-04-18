@@ -37,7 +37,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '5760000'
+    value: '11520000'
   states:
     bus_sink: false
     bus_source: false
@@ -296,6 +296,20 @@ blocks:
     bus_source: false
     bus_structure: null
     coordinate: [392, 172.0]
+    rotation: 0
+    state: true
+- name: xmlrpc_server_0
+  id: xmlrpc_server
+  parameters:
+    addr: localhost
+    alias: ''
+    comment: ''
+    port: '8000'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [536, 12.0]
     rotation: 0
     state: true
 - name: zeromq_rep_sink_0
