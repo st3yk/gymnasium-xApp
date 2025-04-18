@@ -47,6 +47,7 @@ class e2sm_rc_module(object):
         min_prb_policy_ratio = max(0, min(min_prb_ratio, 100))
         max_prb_policy_ratio = max(0, min(max_prb_ratio, 100))
         dedicated_prb_policy_ratio = max(0, min(dedicated_prb_ratio, 100))
+        # print(f"min: {min_prb_policy_ratio}, max: {max_prb_policy_ratio}, dedicated: {dedicated_prb_policy_ratio}")
 
         ue_id = ('gNB-DU-UEID', {'gNB-CU-UE-F1AP-ID': ue_id})
         control_header = self.e2sm_rc_compiler.pack_ric_control_header_f1(style_type=2, control_action_id=6, ue_id_tuple=ue_id)
