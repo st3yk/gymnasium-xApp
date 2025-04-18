@@ -6,7 +6,7 @@ from stable_baselines3.common.env_checker import check_env
 from my_xapp import MonRcApp
 
 class xAppEnv(gym.Env):
-    def __init__(self, max_prbs=18):
+    def __init__(self, xapp: xAppBase, max_prbs=18):
         super(xAppEnv, self).__init__()
         # observation: ue1-ue3 DRB.UEThpUl in Mbps, RRU.PrbUsedUl
         self.observation_space = spaces.Box(low=0, high=np.inf, shape=(6,), dtype=np.float32) # float32 for VecNormalize compatibility
@@ -17,6 +17,7 @@ class xAppEnv(gym.Env):
         self.max_prbs = max_prbs
         self.max_throughput = 13680 # got by trial and error
         self.prbs = [int(max_prbs/3), int(max_prbs/3), int(max_prbs/3)]  # initial PRBs
+        self.xapp.start()
 
     def reset(self, seed=None, options=None):
         # Reset PRBs to initial state
@@ -68,16 +69,12 @@ if __name__ == "__main__":
     xApp = MonRcApp()
     ran_func_id = 2
     xApp.e2sm_kpm.set_ran_func_id(ran_func_id)
-
     # Connect exit signals.
     signal.signal(signal.SIGQUIT, xApp.signal_handler)
     signal.signal(signal.SIGTERM, xApp.signal_handler)
     signal.signal(signal.SIGINT, xApp.signal_handler)
 
-    # Start the xApp
-    xApp.start()
-    env = xAppEnv(max_prbs=18)
-
+    env = xAppEnv(max_prbs=18, xApp)
 
     # Learning
     check_env(env)
