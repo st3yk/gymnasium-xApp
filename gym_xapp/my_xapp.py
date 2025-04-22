@@ -11,17 +11,17 @@ class MonRcApp(xAppBase):
     def __init__(self, http_server_port=8092, rmr_port=4560):
         super(MonRcApp, self).__init__(None, http_server_port, rmr_port)
         self.debug = True
-        self.state = 6 * []
+        self.current = 12 * []
         self.e2_node_id = "gnbd_001_001_00019b_0"
         self.metrics = ["DRB.UEThpDl", "RRU.PrbUsedDl", "NokDl", "McsDl"]
         self.cnt = 0
         self.max_thp = 33485
-        self.max_prb = 45
+        self.max_prb = 44
 
     def my_subscription_callback(self, e2_agent_id, subscription_id, indication_hdr, indication_msg):
         indication_hdr = self.e2sm_kpm.extract_hdr_info(indication_hdr)
         meas_data = self.e2sm_kpm.extract_meas_data(indication_msg)
-        thp_ul, used_prbs = [], []
+        thp, prbs, mcs, nok = "", "", "", ""
 
         if self.debug:
             print("\nRIC Indication Received from {} for Subscription ID: {}, KPM Report Style: 4".format(e2_agent_id, subscription_id))
@@ -43,19 +43,23 @@ class MonRcApp(xAppBase):
             for metric_name, value in ue_meas_data["measData"].items():
                 if self.debug:
                     print("---Metric: {}, Value: {}".format(metric_name, value))
-                if metric_name == "DRB.UEThpUl":
-                    thp_ul.append(round(value[0]/self.max_thp,2))
-                elif metric_name == "RRU.PrbUsedUl":
-                    used_prbs.append(round(value[0]/self.max_prb, 2))
-        self.state = thp_ul + used_prbs
-        # if self.debug:
-        #     print(f"Current state: {self.state}")
-        # self.cnt += 1
-        # if self.cnt % 5 == 1:
-        #     self.set_prb(1, 15 * (self.cnt % 2))
+                if metric_name == "DRB.UEThpDl":
+                        thp += f"{str(value[0])};"
+                elif metric_name == "RRU.PrbUsedDl":
+                        prbs += f"{str(value[0])};"
+                elif metric_name == "McsDl":
+                        mcs += f"{str(value[0])};"
+                elif metric_name == "NokDl":
+                        nok += f"{str(value[0])};"
+        print(f"Throughput: {thp}, count: {self.cnt}")
+        self.state = thp + prbs + mcs + nok
+        with open("xapp", "a") as f:
+            if self.state != "0;0;0;0;0;0;0;0;0;0;0;0;0;":
+                f.write(f"{self.state}\n")
+        print(self.state)
 
     def get_state(self):
-        return state
+        return self.state
 
     def set_prb(self, ue_id, prb_ratio):
         if self.debug:

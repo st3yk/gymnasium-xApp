@@ -38,9 +38,9 @@ def main():
         exit()
 
     ues = {
-        "ue1": {"ip": "10.45.1.2", "bandwidth": "100M"},
-        "ue2": {"ip": "10.45.1.3", "bandwidth": "100M"},
-        "ue3": {"ip": "10.45.1.4", "bandwidth": "100M"}
+        "ue1": {"ip": "10.45.1.2", "bandwidth": "3M"},
+        "ue2": {"ip": "10.45.1.3", "bandwidth": "3M"},
+        "ue3": {"ip": "10.45.1.4", "bandwidth": "3M"}
     }
     duration = int(input("Set duration in seconds: "))  # Test duration in seconds
     
@@ -59,13 +59,15 @@ def main():
     
     # Retrieve and print results
     for ue, process in clients.items():
-        out, _ = process.communicate()
-        print(f"client {ue} output:\n{out.decode()}")
+        if process is not None:
+            out, _ = process.communicate()
+            print(f"client {ue} output:\n{out.decode()}")
         
     for ue, process in servers.items():
-        process.kill()
-        out, _ = process.communicate(timeout=1)
-        print(f"server {ue} output:\n{out.decode()}")
+        if process is not None:
+            process.kill()
+            out, _ = process.communicate(timeout=1)
+            print(f"server {ue} output:\n{out.decode()}")
 
 if __name__ == "__main__":
     main()
