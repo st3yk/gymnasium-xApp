@@ -7,6 +7,7 @@ To use it, three repositories are needed:
  - [oran-sc-ric](https://github.com/srsran/oran-sc-ric), commit: 1356ee99cec9489acf8906768a7a8c927b07597d
 <br>
 To install, go through the provided tutorials:
+
  - [srsRAN gNB with srsUE](https://docs.srsran.com/projects/project/en/latest/tutorials/source/srsUE/source/index.html)
  - [O-RAN NearRT-RIC and xApp](https://docs.srsran.com/projects/project/en/latest/tutorials/source/near-rt-ric/source/index.html)
 
