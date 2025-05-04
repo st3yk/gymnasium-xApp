@@ -1,2 +1,3 @@
 **/__pycache__/
 srsran/*.py
+gym_xapp/runs/*
