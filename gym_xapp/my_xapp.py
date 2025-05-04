@@ -4,24 +4,27 @@ import time
 import datetime
 import argparse
 import signal
+import os
+import queue
 from lib.xAppBase import xAppBase
+from datetime import date
 
 
 class MonRcApp(xAppBase):
-    def __init__(self, http_server_port=8092, rmr_port=4560):
+    def __init__(self, queue: queue.Queue, debug = False, http_server_port=8092, rmr_port=4560):
         super(MonRcApp, self).__init__(None, http_server_port, rmr_port)
-        self.debug = True
-        self.current = 12 * []
+        self.debug = debug
+        self.kpm_queue = queue
         self.e2_node_id = "gnbd_001_001_00019b_0"
         self.metrics = ["DRB.UEThpDl", "RRU.PrbUsedDl", "NokDl", "McsDl"]
-        self.cnt = 0
-        self.max_thp = 33485
-        self.max_prb = 44
+        # Logfile for graphs and xApp
+        self.logfile = f"runs/{date.today()}-1.log"
+        self._init_log()
 
     def my_subscription_callback(self, e2_agent_id, subscription_id, indication_hdr, indication_msg):
         indication_hdr = self.e2sm_kpm.extract_hdr_info(indication_hdr)
         meas_data = self.e2sm_kpm.extract_meas_data(indication_msg)
-        thp, prbs, mcs, nok = "", "", "", ""
+        thp, prbs, mcs, nok = [], [], [], []
 
         if self.debug:
             print("\nRIC Indication Received from {} for Subscription ID: {}, KPM Report Style: 4".format(e2_agent_id, subscription_id))
@@ -44,22 +47,18 @@ class MonRcApp(xAppBase):
                 if self.debug:
                     print("---Metric: {}, Value: {}".format(metric_name, value))
                 if metric_name == "DRB.UEThpDl":
-                        thp += f"{str(value[0])};"
+                        thp.append(f"{str(value[0])}")
                 elif metric_name == "RRU.PrbUsedDl":
-                        prbs += f"{str(value[0])};"
+                        prbs.append(f"{str(value[0])}")
                 elif metric_name == "McsDl":
-                        mcs += f"{str(value[0])};"
+                        mcs.append(f"{str(value[0])}")
                 elif metric_name == "NokDl":
-                        nok += f"{str(value[0])};"
-        print(f"Throughput: {thp}, count: {self.cnt}")
-        self.state = thp + prbs + mcs + nok
-        with open("xapp", "a") as f:
-            if self.state != "0;0;0;0;0;0;0;0;0;0;0;0;0;":
-                f.write(f"{self.state}\n")
-        print(self.state)
-
-    def get_state(self):
-        return self.state
+                        nok.append(f"{str(value[0])}")
+        current = ";".join(thp + prbs + mcs + nok)
+        self.kpm_queue.put(current)
+        with open(self.logfile, "a") as f:
+            if current != "0;0;0;0;0;0;0;0;0;0;0;0;0":
+                f.write(f"{current}\n")
 
     def set_prb(self, ue_id, prb_ratio):
         if self.debug:
@@ -89,6 +88,23 @@ class MonRcApp(xAppBase):
         if self.debug:
             print("Subscribe to E2 node ID: {}, RAN func: e2sm_kpm, Report Style: 4, metrics: {}".format(self.e2_node_id, self.metrics))
         self.e2sm_kpm.subscribe_report_service_style_4(self.e2_node_id, report_period, matchingUeConds, self.metrics, granul_period, subscription_callback)
+
+    def _init_log(self):
+        try:
+            os.makedirs('runs')
+        except FileExistsError:
+            pass
+        i = 1
+        while os.path.isfile(self.logfile):
+            i += 1
+            self.logfile = f"runs/{date.today()}-{i}.log"
+        header = ['UE0_Throughput', 'UE1_Throughput', 'UE2_Throughput',
+                'UE0_PRBs_Used', 'UE1_PRBs_Used', 'UE2_PRBs_Used',
+                'UE0_MCS', 'UE1_MCS', 'UE2_MCS',
+                'UE0_NOK', 'UE1_NOK', 'UE2_NOK']
+        with open(self.logfile, 'a') as f:
+            h = ';'.join(header)
+            f.write(f"{h}\n")
 
 
 if __name__ == '__main__':
