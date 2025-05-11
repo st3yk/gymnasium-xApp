@@ -36,4 +36,11 @@ root@python_xapp_runner:/opt/xApps# ./my_xapp.py
 Subscribe to E2 node ID: gnbd_001_001_00019b_0, RAN func: e2sm_kpm, Report Style: 4, metrics: ['DRB.UEThpDl', 'RRU.PrbUsedDl', 'NokDl', 'McsDl']
 Successfully subscribed with Subscription ID:  2vu6K85SD7zQRRqpZZQR2DLKAkX
 ```
-
+## Tensorboard Dashboard
+Logs are stored in the format that Tensorboard supports. To use:
+```console
+$ ./setup_venv.sh
+$ source tb/bin/activate
+$ tensorboard --logdir ../../gym_xapp/runs/
+```
+And then it should be ready on localhost:6006 in your browser.
