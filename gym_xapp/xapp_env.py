@@ -2,20 +2,24 @@
 
 import gymnasium as gym
 import numpy as np
+import torch as th
 import signal
 import threading
 import queue
+import os
 from gymnasium import spaces
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_checker import check_env
 from my_xapp import MonRcApp
 from enum import Enum
+from datetime import date
 
 class xAppEnv(gym.Env):
-    def __init__(self, xapp: MonRcApp, queue: queue.Queue):
+    def __init__(self, xapp: MonRcApp, queue: queue.Queue, n_steps: int):
         super(xAppEnv, self).__init__()
         # DRL Action + State
         self.current_step = 0
+        self.n_steps = n_steps
         self.observation_space = spaces.Box(low=-1, high=1, shape=(12,), dtype=np.float32)
         self.action_space = spaces.MultiDiscrete([3, 3]) # Selects 1 UE, changes PRB limit
         self.state = np.zeros(12)
@@ -35,6 +39,7 @@ class xAppEnv(gym.Env):
         self.xapp_thread.start()
 
     def reset(self, seed=None, options=None):
+        self.current_step = 0
         self.prbs = [int(self.max_prbs/3), int(self.max_prbs/3), int(self.max_prbs/3)]
         self._apply_prbs()
         self.state = np.zeros(12, dtype=np.float32)
@@ -52,7 +57,7 @@ class xAppEnv(gym.Env):
             self.prbs[ue_idx] = new_prbs
             legal_action = True
         if legal_action:
-            self._apply_prbs()
+            self._apply_prbs(int(ue_idx))
 
         # Fetch updated KPMs
         kpms = self.kpm_queue.get()
@@ -69,10 +74,10 @@ class xAppEnv(gym.Env):
         r_illegal = float(not legal_action)
 
         reward = 0.6 * r_thp + 0.3 * r_fair - 0.3 * r_nok - 0.6 * r_illegal
-        print(f"Reward -> Thp: {r_thp}, Fairness: {r_fair}, Not ok: {r_nok}, illegal: {r_illegal} = {reward}")
+        print(f"Reward -> Thp: {r_thp:.4f}, Fairness: {r_fair:.4f}, Not ok: {r_nok:.4f}, illegal: {r_illegal} = {reward:.4f}")
         done = False
         self.current_step += 1
-        if self.current_step == 1000:
+        if self.current_step == self.n_steps:
             done = True
         
         return self.state, reward, done, False, {}
@@ -99,10 +104,14 @@ class xAppEnv(gym.Env):
     def _normalize(self, value, min_v, max_v):
         return 2 * (value - min_v) / (max_v - min_v) - 1 # min max scaling [-1;1]
 
-    def _apply_prbs(self):
-        for ue_id in range(self.ues):
-            print(f"Setting {self.prbs[ue_id]} PRBs for {ue_id}")
-            self.xapp.set_prb(ue_id, self.prbs[ue_id])
+    def _apply_prbs(self, id=-1):
+        if id < 0:
+            print(f"Resetting PRBs to [15, 15, 15]")
+            for ue_id in range(self.ues):
+                self.xapp.set_prb(ue_id, self.prbs[ue_id])
+        else:
+            print(f"Setting {self.prbs[id]} PRBs for {id}")
+            self.xapp.set_prb(id, self.prbs[id])
 
     def _jain_fairness(self, throughputs):
         if sum(throughputs) == 0:
@@ -115,9 +124,24 @@ class xAppEnv(gym.Env):
         return max_prbs * total_throughputs / max_throughput
 
 if __name__ == "__main__":
+    iterations = 5
+    steps = 10
+    # Custom actor (pi) and value function (vf) networks
+    policy_kwargs = dict(activation_fn=th.nn.Tanh,
+                     net_arch=dict(pi=[32, 32], vf=[32, 32]))
+    # In the format: ActivationFunction-p<pi layers>-v<vf layers>
+    config_name = 'Tanh-p32-32-v32-32'
+    # Logs
+    log_dir = './runs'
+    for i in range(1, 100):
+        drl_log = f"{log_dir}/PPO/{i}"
+        if os.path.isdir(drl_log) == False:
+            break
+    os.makedirs(drl_log, exist_ok=True)
+    kpm_log = f"{drl_log}/kpm.log"
     # Create xApp for fetching KPM and setting PRBs
     queue = queue.Queue()
-    xApp = MonRcApp(queue)
+    xApp = MonRcApp(queue, kpm_log)
     ran_func_id = 2
     xApp.e2sm_kpm.set_ran_func_id(ran_func_id)
     # Connect exit signals
@@ -125,9 +149,10 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, xApp.signal_handler)
     signal.signal(signal.SIGINT, xApp.signal_handler)
 
-    env = xAppEnv(xApp, queue)
     # Learning
-    check_env(env)
-    model = PPO("MlpPolicy", env, verbose=1)
-    model.learn(total_timesteps=1000)
-    env.xapp_thread.stop()
+    env = xAppEnv(xApp, queue, steps)
+    model = PPO("MlpPolicy", env, n_steps = steps, verbose=1, tensorboard_log=drl_log, policy_kwargs=policy_kwargs)
+    model.learn(total_timesteps=int(iterations * steps))
+    model.save(f"{drl_log}/PPO-{config_name}")
+    env.xapp.stop() # Calls stop function from xAppBase
+    env.xapp_thread.join()

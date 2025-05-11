@@ -7,18 +7,17 @@ import signal
 import os
 import queue
 from lib.xAppBase import xAppBase
-from datetime import date
 
 
 class MonRcApp(xAppBase):
-    def __init__(self, queue: queue.Queue, debug = False, http_server_port=8092, rmr_port=4560):
+    def __init__(self, queue: queue.Queue, log_file: str, debug = False, http_server_port=8092, rmr_port=4560):
         super(MonRcApp, self).__init__(None, http_server_port, rmr_port)
         self.debug = debug
         self.kpm_queue = queue
         self.e2_node_id = "gnbd_001_001_00019b_0"
         self.metrics = ["DRB.UEThpDl", "RRU.PrbUsedDl", "NokDl", "McsDl"]
-        # Logfile for graphs and xApp
-        self.logfile = f"runs/{date.today()}-1.log"
+        # Log for graphs and xApp
+        self.log_file = log_file
         self._init_log()
 
     def my_subscription_callback(self, e2_agent_id, subscription_id, indication_hdr, indication_msg):
@@ -56,7 +55,7 @@ class MonRcApp(xAppBase):
                         nok.append(f"{str(value[0])}")
         current = ";".join(thp + prbs + mcs + nok)
         self.kpm_queue.put(current)
-        with open(self.logfile, "a") as f:
+        with open(self.log_file, "a") as f:
             if current != "0;0;0;0;0;0;0;0;0;0;0;0;0":
                 f.write(f"{current}\n")
 
@@ -90,19 +89,11 @@ class MonRcApp(xAppBase):
         self.e2sm_kpm.subscribe_report_service_style_4(self.e2_node_id, report_period, matchingUeConds, self.metrics, granul_period, subscription_callback)
 
     def _init_log(self):
-        try:
-            os.makedirs('runs')
-        except FileExistsError:
-            pass
-        i = 1
-        while os.path.isfile(self.logfile):
-            i += 1
-            self.logfile = f"runs/{date.today()}-{i}.log"
         header = ['UE0_Throughput', 'UE1_Throughput', 'UE2_Throughput',
                 'UE0_PRBs_Used', 'UE1_PRBs_Used', 'UE2_PRBs_Used',
                 'UE0_MCS', 'UE1_MCS', 'UE2_MCS',
                 'UE0_NOK', 'UE1_NOK', 'UE2_NOK']
-        with open(self.logfile, 'a') as f:
+        with open(self.log_file, 'a') as f:
             h = ';'.join(header)
             f.write(f"{h}\n")
 
