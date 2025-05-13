@@ -17,6 +17,7 @@ from datetime import date
 class xAppEnv(gym.Env):
     def __init__(self, xapp: MonRcApp, queue: queue.Queue, n_steps: int):
         super(xAppEnv, self).__init__()
+        self.debug = False
         # DRL Action + State
         self.current_step = 0
         self.n_steps = n_steps
@@ -60,6 +61,8 @@ class xAppEnv(gym.Env):
             self._apply_prbs(int(ue_idx))
 
         # Fetch updated KPMs
+        if self.debug:
+            print(f"Elements in the queue: {self.kpm_queue.qsize()}")
         kpms = self.kpm_queue.get()
 
         # Get new state
@@ -74,7 +77,8 @@ class xAppEnv(gym.Env):
         r_illegal = float(not legal_action)
 
         reward = 0.6 * r_thp + 0.3 * r_fair - 0.3 * r_nok - 0.6 * r_illegal
-        print(f"Reward -> Thp: {r_thp:.4f}, Fairness: {r_fair:.4f}, Not ok: {r_nok:.4f}, illegal: {r_illegal} = {reward:.4f}")
+        if self.debug:
+            print(f"Reward -> Thp: {r_thp:.4f}, Fairness: {r_fair:.4f}, Not ok: {r_nok:.4f}, illegal: {r_illegal} = {reward:.4f}")
         done = False
         self.current_step += 1
         if self.current_step == self.n_steps:
@@ -84,7 +88,8 @@ class xAppEnv(gym.Env):
 
     def _decode_kpms(self, kpms, max_throughput, max_prbs):
         splitted = kpms.split(';')
-        print(f"Splitted: {splitted}")
+        if self.debug:
+            print(f"Splitted: {splitted}")
         st = np.zeros(self.observation_space.shape, dtype=self.observation_space.dtype)
         for i in range(len(splitted)):
             min_v = 0
@@ -98,7 +103,6 @@ class xAppEnv(gym.Env):
                 max_v = 1000
             value = float(splitted[i])
             st[i] = self._normalize(value, min_v, max_v)
-        print(st)
         return st
 
     def _normalize(self, value, min_v, max_v):
@@ -106,11 +110,13 @@ class xAppEnv(gym.Env):
 
     def _apply_prbs(self, id=-1):
         if id < 0:
-            print(f"Resetting PRBs to [15, 15, 15]")
+            if self.debug:
+                print(f"Resetting PRBs to [15, 15, 15]")
             for ue_id in range(self.ues):
                 self.xapp.set_prb(ue_id, self.prbs[ue_id])
         else:
-            print(f"Setting {self.prbs[id]} PRBs for {id}")
+            if self.debug:
+                print(f"Setting {self.prbs[id]} PRBs for {id}")
             self.xapp.set_prb(id, self.prbs[id])
 
     def _jain_fairness(self, throughputs):
@@ -124,13 +130,13 @@ class xAppEnv(gym.Env):
         return max_prbs * total_throughputs / max_throughput
 
 if __name__ == "__main__":
-    iterations = 5
-    steps = 10
+    iterations = 10
+    steps = 5000 # with granularity period 50, 1000 steps take 50 seconds
     # Custom actor (pi) and value function (vf) networks
     policy_kwargs = dict(activation_fn=th.nn.Tanh,
-                     net_arch=dict(pi=[32, 32], vf=[32, 32]))
+                     net_arch=dict(pi=[64, 64, 64], vf=[64, 64, 64]))
     # In the format: ActivationFunction-p<pi layers>-v<vf layers>
-    config_name = 'Tanh-p32-32-v32-32'
+    config_name = 'Tanh-p64-64-64-v64-64-64'
     # Logs
     log_dir = './runs'
     for i in range(1, 100):
@@ -138,7 +144,7 @@ if __name__ == "__main__":
         if os.path.isdir(drl_log) == False:
             break
     os.makedirs(drl_log, exist_ok=True)
-    kpm_log = f"{drl_log}/kpm.log"
+    kpm_log = f"{drl_log}/{config_name}-kpm.log"
     # Create xApp for fetching KPM and setting PRBs
     queue = queue.Queue()
     xApp = MonRcApp(queue, kpm_log)

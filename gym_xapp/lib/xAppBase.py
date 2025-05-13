@@ -178,10 +178,11 @@ class xAppBase(object):
                     except Exception as e:
                         print("Error during RIC indication decoding: {}".format(e))
                         pass
-                if (summary['message type'] == 12041):
-                    print("Received RIC_CONTROL_ACK")
-                if (summary['message type'] == 12042):
-                    print("Received RIC_CONTROL_FAILURE")
+                if False: # DEBUG
+                    if (summary['message type'] == 12041):
+                        print("Received RIC_CONTROL_ACK")
+                    if (summary['message type'] == 12042):
+                        print("Received RIC_CONTROL_FAILURE")
 
             rmr.rmr_free_msg(sbuf)
 
