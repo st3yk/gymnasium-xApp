@@ -44,6 +44,9 @@ class xAppEnv(gym.Env):
         self.prbs = [int(self.max_prbs/3), int(self.max_prbs/3), int(self.max_prbs/3)]
         self._apply_prbs()
         self.state = np.zeros(12, dtype=np.float32)
+        while not self.kpm_queue.empty():
+            # Clear the queue or we'll perform actions based on slightly older KPMs
+             self.kpm_queue.get()
         return self.state, {}
 
     def step(self, action):
@@ -61,7 +64,7 @@ class xAppEnv(gym.Env):
             self._apply_prbs(int(ue_idx))
 
         # Fetch updated KPMs
-        if self.debug:
+        if self.kpm_queue.qsize() > 10:
             print(f"Elements in the queue: {self.kpm_queue.qsize()}")
         kpms = self.kpm_queue.get()
 
@@ -76,12 +79,17 @@ class xAppEnv(gym.Env):
         r_nok = sum(not_ok) / self.max_packets
         r_illegal = float(not legal_action)
 
-        reward = 0.6 * r_thp + 0.3 * r_fair - 0.3 * r_nok - 0.6 * r_illegal
+        if legal_action:
+            reward = 0.4 * r_thp + 0.6 * r_fair
+        else:
+            reward = -1
+
         if self.debug:
             print(f"Reward -> Thp: {r_thp:.4f}, Fairness: {r_fair:.4f}, Not ok: {r_nok:.4f}, illegal: {r_illegal} = {reward:.4f}")
+
         done = False
         self.current_step += 1
-        if self.current_step == self.n_steps:
+        if self.current_step == self.n_steps or not legal_action:
             done = True
         
         return self.state, reward, done, False, {}
@@ -130,13 +138,15 @@ class xAppEnv(gym.Env):
         return max_prbs * total_throughputs / max_throughput
 
 if __name__ == "__main__":
-    iterations = 10
-    steps = 5000 # with granularity period 50, 1000 steps take 50 seconds
+    # with granularity period 50, 1000 steps take 50 seconds
+    # 150 steps -> 7.5s
+    iterations = 500
+    steps = 150
     # Custom actor (pi) and value function (vf) networks
-    policy_kwargs = dict(activation_fn=th.nn.Tanh,
-                     net_arch=dict(pi=[64, 64, 64], vf=[64, 64, 64]))
+    policy_kwargs = dict(activation_fn=th.nn.ReLU,
+                     net_arch=dict(pi=[64, 64], vf=[64, 64]))
     # In the format: ActivationFunction-p<pi layers>-v<vf layers>
-    config_name = 'Tanh-p64-64-64-v64-64-64'
+    config_name = 'ReLU-p64-64-v64-64'
     # Logs
     log_dir = './runs'
     for i in range(1, 100):
@@ -157,8 +167,22 @@ if __name__ == "__main__":
 
     # Learning
     env = xAppEnv(xApp, queue, steps)
-    model = PPO("MlpPolicy", env, n_steps = steps, verbose=1, tensorboard_log=drl_log, policy_kwargs=policy_kwargs)
+    # model = PPO("MlpPolicy", env, n_steps = steps, verbose=1, tensorboard_log=drl_log, policy_kwargs=policy_kwargs)
+    model = PPO(
+        policy="MlpPolicy",
+        env=env,
+        n_steps=steps,
+        learning_rate=1e-3,
+        batch_size=25,
+        gamma=0.99,
+        verbose=1,
+        tensorboard_log=drl_log,
+        policy_kwargs=policy_kwargs
+)
+
     model.learn(total_timesteps=int(iterations * steps))
     model.save(f"{drl_log}/PPO-{config_name}")
     env.xapp.stop() # Calls stop function from xAppBase
     env.xapp_thread.join()
+    # PPO + LSTM
+    # DDQN
