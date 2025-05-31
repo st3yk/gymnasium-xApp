@@ -9,6 +9,7 @@ import queue
 import os
 from gymnasium import spaces
 from stable_baselines3 import PPO
+from stable_baselines3 import A2C
 from stable_baselines3.common.env_checker import check_env
 from my_xapp import MonRcApp
 from enum import Enum
@@ -21,9 +22,9 @@ class xAppEnv(gym.Env):
         # DRL Action + State
         self.current_step = 0
         self.n_steps = n_steps
-        self.observation_space = spaces.Box(low=-1, high=1, shape=(12,), dtype=np.float32)
-        self.action_space = spaces.MultiDiscrete([3, 3]) # Selects 1 UE, changes PRB limit
-        self.state = np.zeros(12)
+        self.observation_space = spaces.Box(low=-1, high=1, shape=(8,), dtype=np.float32)
+        self.action_space = spaces.MultiDiscrete([2, 3]) # Selects 1 UE, changes PRB limit
+        self.state = np.zeros(8)
         self.kpm_queue = queue
 
         # Values specific for the use case
@@ -31,9 +32,9 @@ class xAppEnv(gym.Env):
         self.max_throughput = 29712
         self.max_prbs = 45
         self.max_packets = 1000
-        self.ues = 3
+        self.ues = 2
         self.prb_diff = 3
-        self.prbs = [int(self.max_prbs/3), int(self.max_prbs/3), int(self.max_prbs/3)]
+        self.prbs = [int(self.max_prbs/3), int(self.max_prbs/3)]
 
         self.xapp = xapp
         self.xapp_thread = threading.Thread(target=self.xapp.start)
@@ -41,9 +42,9 @@ class xAppEnv(gym.Env):
 
     def reset(self, seed=None, options=None):
         self.current_step = 0
-        self.prbs = [int(self.max_prbs/3), int(self.max_prbs/3), int(self.max_prbs/3)]
+        self.prbs = [int(self.max_prbs/3), int(self.max_prbs/3)]
         self._apply_prbs()
-        self.state = np.zeros(12, dtype=np.float32)
+        self.state = np.zeros(8, dtype=np.float32)
         while not self.kpm_queue.empty():
             # Clear the queue or we'll perform actions based on slightly older KPMs
              self.kpm_queue.get()
@@ -64,7 +65,7 @@ class xAppEnv(gym.Env):
             self._apply_prbs(int(ue_idx))
 
         # Fetch updated KPMs
-        if self.kpm_queue.qsize() > 10:
+        if self.kpm_queue.qsize() > 1:
             print(f"Elements in the queue: {self.kpm_queue.qsize()}")
         kpms = self.kpm_queue.get()
 
@@ -140,17 +141,17 @@ class xAppEnv(gym.Env):
 if __name__ == "__main__":
     # with granularity period 50, 1000 steps take 50 seconds
     # 150 steps -> 7.5s
-    iterations = 500
-    steps = 150
+    iterations = 100
+    steps = 200
     # Custom actor (pi) and value function (vf) networks
-    policy_kwargs = dict(activation_fn=th.nn.ReLU,
+    policy_kwargs = dict(activation_fn=th.nn.Tanh,
                      net_arch=dict(pi=[64, 64], vf=[64, 64]))
-    # In the format: ActivationFunction-p<pi layers>-v<vf layers>
-    config_name = 'ReLU-p64-64-v64-64'
+    # In the format: Algorithm-ActivationFunction-p<pi layers>-v<vf layers>
+    config_name = 'PPO-Tanh-p64-64-v64-64'
     # Logs
     log_dir = './runs'
     for i in range(1, 100):
-        drl_log = f"{log_dir}/PPO/{i}"
+        drl_log = f"{log_dir}/29.05/{i}"
         if os.path.isdir(drl_log) == False:
             break
     os.makedirs(drl_log, exist_ok=True)
@@ -167,7 +168,6 @@ if __name__ == "__main__":
 
     # Learning
     env = xAppEnv(xApp, queue, steps)
-    # model = PPO("MlpPolicy", env, n_steps = steps, verbose=1, tensorboard_log=drl_log, policy_kwargs=policy_kwargs)
     model = PPO(
         policy="MlpPolicy",
         env=env,
@@ -178,11 +178,23 @@ if __name__ == "__main__":
         verbose=1,
         tensorboard_log=drl_log,
         policy_kwargs=policy_kwargs
-)
+    )
 
     model.learn(total_timesteps=int(iterations * steps))
-    model.save(f"{drl_log}/PPO-{config_name}")
+    model.save(f"{drl_log}/{config_name}")
     env.xapp.stop() # Calls stop function from xAppBase
     env.xapp_thread.join()
+
+    # model = RecurrentPPO(
+    #     policy="MlpLstmPolicy",
+    #     env=env,
+    #     n_steps=steps,
+    #     learning_rate=1e-3,
+    #     batch_size=25,
+    #     gamma=0.99,
+    #     verbose=1,
+    #     tensorboard_log=drl_log,
+    #     policy_kwargs=policy_kwargs
+    # )
     # PPO + LSTM
     # DDQN

@@ -56,7 +56,7 @@ class MonRcApp(xAppBase):
         current = ";".join(thp + prbs + mcs + nok)
         self.kpm_queue.put(current)
         with open(self.log_file, "a") as f:
-            if current != "0;0;0;0;0;0;0;0;0;0;0;0;0":
+            if current != 2 * "0;0;0;0;" + "0":
                 f.write(f"{current}\n")
 
     def set_prb(self, ue_id, prb_ratio):
@@ -75,8 +75,8 @@ class MonRcApp(xAppBase):
     # It is required to start the internal msg receive loop.
     @xAppBase.start_function
     def start(self):
-        report_period = 50
-        granul_period = 50
+        report_period = 75
+        granul_period = 75
         # xApp will use E2SM KPM Report Style 4
         # It will store the last state for all of them to return it to the environment when asked
         subscription_callback = lambda agent, sub, hdr, msg: self.my_subscription_callback(agent, sub, hdr, msg)
@@ -89,10 +89,10 @@ class MonRcApp(xAppBase):
         self.e2sm_kpm.subscribe_report_service_style_4(self.e2_node_id, report_period, matchingUeConds, self.metrics, granul_period, subscription_callback)
 
     def _init_log(self):
-        header = ['UE0_Throughput', 'UE1_Throughput', 'UE2_Throughput',
-                'UE0_PRBs_Used', 'UE1_PRBs_Used', 'UE2_PRBs_Used',
-                'UE0_MCS', 'UE1_MCS', 'UE2_MCS',
-                'UE0_NOK', 'UE1_NOK', 'UE2_NOK']
+        header = ['UE0_Throughput', 'UE1_Throughput',
+                'UE0_PRBs_Used', 'UE1_PRBs_Used',
+                'UE0_MCS', 'UE1_MCS',
+                'UE0_NOK', 'UE1_NOK']
         with open(self.log_file, 'a') as f:
             h = ';'.join(header)
             f.write(f"{h}\n")

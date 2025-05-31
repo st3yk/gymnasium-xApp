@@ -32,7 +32,7 @@ def generate_traffic(ue_ip: str, bandwidth: str, duration: int):
             )
 
 def increase_pathloss_for_random_ue(grc_proxy):
-    id = random.randint(1,3)
+    id = random.randint(1,2)
     pathloss_setter = f"set_ue{id}_path_loss_db"
     change_pathloss = getattr(grc_proxy, pathloss_setter)
     pathloss_getter = f"get_ue{id}_path_loss_db"
@@ -55,9 +55,8 @@ def main():
     grc_proxy.set_ue3_path_loss_db(float(10.0))
 
     ues = {
-        "ue1": {"ip": "10.45.1.2", "bandwidth": "8M"},
-        "ue2": {"ip": "10.45.1.3", "bandwidth": "8M"},
-        "ue3": {"ip": "10.45.1.4", "bandwidth": "8M"}
+        "ue1": {"ip": "10.45.1.2", "bandwidth": "13M"},
+        "ue2": {"ip": "10.45.1.3", "bandwidth": "13M"}
     }
     duration = int(input("Set duration in seconds: "))  # Test duration in seconds
     
