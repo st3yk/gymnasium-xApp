@@ -3,3 +3,4 @@ srsran/*.py
 gym_xapp/runs/*
 scripts/tensorboard/tb
 scripts/graphs/gph
+scripts/graphs/obrazki/*
