@@ -1,26 +1,40 @@
 #!/usr/bin/env bash
-# Run without sudo
+SESSION="srsRAN"
+DIR="/home/ts"
 
-DIR="/home/tymons/Repos/srsRAN/"
+tmux new-session -d -s $SESSION -n 5gc
+# Add UE namespaces
+sudo ip netns add ue1 && sudo ip netns add ue2
 
-echo "Creating a tab with 5gc container..."
-gnome-terminal --tab -- bash -c "cd ${DIR}/srsRAN_Project/docker && docker compose down && docker compose up 5gc; bash"
-sleep 5 # wait for the 5gc to start
+# Window 0: Start 5GC
+tmux send-keys -t $SESSION:0 "cd ${DIR}/srsRAN_Project/docker && docker compose down && docker compose up 5gc" C-m
 
-echo "Creating a tab with nearRT-RIC containers..."
-gnome-terminal --tab -- bash -c "cd ${DIR}/oran-sc-ric && docker compose down && docker compose up; bash"
-sleep 5 # wait for the nearRT-RIC to start
+# Window 1: Start nearRT-RIC
+tmux new-window -t $SESSION -n ric
+tmux send-keys -t $SESSION:1 "cd ${DIR}/oran-sc-ric && docker compose down && docker compose up" C-m
 
-echo "Start gNB"
-gnome-terminal --tab -- bash -c "cd ${DIR}/srsRAN_Project/build/apps/gnb && sudo ./gnb -c gnb_zmq.yaml e2 --addr='10.0.2.10' --bind_addr='10.0.2.1'; bash"
+# Window 2: Start gNB
+sleep 5
+tmux new-window -t $SESSION -n gnb
+tmux send-keys -t $SESSION:2 "cd ${DIR}/srsRAN_Project/build/apps/gnb && sudo gdb --args ./gnb -c gnb_zmq.yaml e2 --addr='10.0.2.10' --bind_addr='10.0.2.1'" C-m
 
-echo "Add network namespaces for the UEs"
-gnome-terminal --tab -- bash -c "sudo ip netns add ue1 && sudo ip netns add ue2"
+# Window 3: Start UE1
+tmux new-window -t $SESSION -n ue1
+tmux send-keys -t $SESSION:3 "cd ${DIR}/srsRAN_4G/build/srsue/src && sudo ./srsue ue1_zmq.conf" C-m
 
-echo "Start UEs"
-gnome-terminal --tab -- bash -c "cd ${DIR}/srsRAN_4G/build/srsue/src && sudo ./srsue ue1_zmq.conf; bash"
-gnome-terminal --tab -- bash -c "cd ${DIR}/srsRAN_4G/build/srsue/src && sudo ./srsue ue2_zmq.conf; bash"
-# gnome-terminal --tab -- bash -c "cd ${DIR}/srsRAN_4G/build/srsue/src && sudo ./srsue ue3_zmq.conf; bash"
+# Window 4: Start UE2
+tmux new-window -t $SESSION -n ue2
+tmux send-keys -t $SESSION:4 "cd ${DIR}/srsRAN_4G/build/srsue/src && sudo ./srsue ue2_zmq.conf" C-m
 
-echo "Start GNU Radio Companion"
-gnome-terminal --tab -- bash -c "sudo gnuradio-companion ${DIR}/../gymnasium-xApp/srsran/multi_ue_scenario2.grc; bash"
+# Window 5: Start GNU Radio Companion
+sleep 5
+tmux new-window -t $SESSION -n grc
+tmux send-keys -t $SESSION:5 "QT_QPA_PLATFORM=offscreen python3 ${DIR}/gymnasium-xApp/srsran/multi_ue_scenario.py" C-m
+
+# Window 6: Routing test
+sleep 5
+tmux new-window -t $SESSION -n test
+tmux send-keys -t $SESSION:6 "${DIR}/gymnasium-xApp/scripts/add_routes_downlink.sh" C-m
+
+# Attach to session
+tmux attach-session -t $SESSION
