@@ -33,8 +33,8 @@ class xAppEnv(gym.Env):
         self.max_prbs = 45
         self.max_packets = 1000
         self.ues = 2
-        self.prb_diff = 3
-        self.prbs = [int(self.max_prbs/3), int(self.max_prbs/3)]
+        self.prb_diff = 1
+        self.prbs = [22, 22]
 
         self.xapp = xapp
         self.xapp_thread = threading.Thread(target=self.xapp.start)
@@ -42,7 +42,7 @@ class xAppEnv(gym.Env):
 
     def reset(self, seed=None, options=None):
         self.current_step = 0
-        self.prbs = [int(self.max_prbs/3), int(self.max_prbs/3)]
+        self.prbs = [22, 22]
         self._apply_prbs()
         self.state = np.zeros(8, dtype=np.float32)
         while not self.kpm_queue.empty():
@@ -74,10 +74,8 @@ class xAppEnv(gym.Env):
 
         # Reward: Total Throughput + Jain's Fairness Index - Number of Not Okay Packets - Penalty for Illegal Action
         throughputs = [float(x) for x in kpms.split(';')[:self.ues]]
-        not_ok = [float(x) for x in kpms.split(';')[3*self.ues:]]
         r_thp = sum(throughputs) / self.max_throughput
         r_fair = self._jain_fairness(throughputs)
-        r_nok = sum(not_ok) / self.max_packets
         r_illegal = float(not legal_action)
 
         if legal_action:
@@ -86,7 +84,7 @@ class xAppEnv(gym.Env):
             reward = -1
 
         if self.debug:
-            print(f"Reward -> Thp: {r_thp:.4f}, Fairness: {r_fair:.4f}, Not ok: {r_nok:.4f}, illegal: {r_illegal} = {reward:.4f}")
+            print(f"Reward -> Thp: {r_thp:.4f}, Fairness: {r_fair:.4f}, illegal: {r_illegal} = {reward:.4f}")
 
         done = False
         self.current_step += 1
@@ -119,13 +117,9 @@ class xAppEnv(gym.Env):
 
     def _apply_prbs(self, id=-1):
         if id < 0:
-            if self.debug:
-                print(f"Resetting PRBs to [15, 15, 15]")
             for ue_id in range(self.ues):
                 self.xapp.set_prb(ue_id, self.prbs[ue_id])
         else:
-            if self.debug:
-                print(f"Setting {self.prbs[id]} PRBs for {id}")
             self.xapp.set_prb(id, self.prbs[id])
 
     def _jain_fairness(self, throughputs):
@@ -141,24 +135,26 @@ class xAppEnv(gym.Env):
 if __name__ == "__main__":
     # with granularity period 50, 1000 steps take 50 seconds
     # 150 steps -> 7.5s
-    iterations = 100
+    iterations = 250
     steps = 200
     # Custom actor (pi) and value function (vf) networks
-    policy_kwargs = dict(activation_fn=th.nn.Tanh,
-                     net_arch=dict(pi=[64, 64], vf=[64, 64]))
+    policy_kwargs = dict(activation_fn=th.nn.ReLU,
+                     net_arch=dict(pi=[32, 32], vf=[32, 32]))
     # In the format: Algorithm-ActivationFunction-p<pi layers>-v<vf layers>
-    config_name = 'PPO-Tanh-p64-64-v64-64'
+    config_name = 'new-ReLU-p32-32-v32-v32'
     # Logs
     log_dir = './runs'
     for i in range(1, 100):
-        drl_log = f"{log_dir}/29.05/{i}"
+        drl_log = f"{log_dir}/{config_name}"
+        if i > 1:
+            drl_log = f"{log_dir}/{i}-{config_name}"
         if os.path.isdir(drl_log) == False:
             break
     os.makedirs(drl_log, exist_ok=True)
-    kpm_log = f"{drl_log}/{config_name}-kpm.log"
+    kpm_log = f"{drl_log}/kpm.log"
     # Create xApp for fetching KPM and setting PRBs
     queue = queue.Queue()
-    xApp = MonRcApp(queue, kpm_log)
+    xApp = MonRcApp(queue, kpm_log, True)
     ran_func_id = 2
     xApp.e2sm_kpm.set_ran_func_id(ran_func_id)
     # Connect exit signals
@@ -184,17 +180,3 @@ if __name__ == "__main__":
     model.save(f"{drl_log}/{config_name}")
     env.xapp.stop() # Calls stop function from xAppBase
     env.xapp_thread.join()
-
-    # model = RecurrentPPO(
-    #     policy="MlpLstmPolicy",
-    #     env=env,
-    #     n_steps=steps,
-    #     learning_rate=1e-3,
-    #     batch_size=25,
-    #     gamma=0.99,
-    #     verbose=1,
-    #     tensorboard_log=drl_log,
-    #     policy_kwargs=policy_kwargs
-    # )
-    # PPO + LSTM
-    # DDQN
