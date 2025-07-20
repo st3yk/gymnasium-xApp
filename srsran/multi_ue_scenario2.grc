@@ -63,7 +63,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1064, 468.0]
+    coordinate: [1304, 516.0]
     rotation: 0
     state: true
 - name: ue1_path_loss_db
@@ -84,7 +84,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1088, 20.0]
+    coordinate: [1280, 12.0]
     rotation: 0
     state: true
 - name: ue2_path_loss_db
@@ -105,7 +105,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1088, 172.0]
+    coordinate: [1280, 172.0]
     rotation: 0
     state: true
 - name: ue3_path_loss_db
@@ -126,7 +126,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1088, 324.0]
+    coordinate: [1288, 324.0]
     rotation: 0
     state: true
 - name: zmq_hwm
@@ -153,6 +153,44 @@ blocks:
     coordinate: [304, 12.0]
     rotation: 0
     state: enabled
+- name: analog_noise_source_x_0
+  id: analog_noise_source_x
+  parameters:
+    affinity: ''
+    alias: ''
+    amp: '0.01'
+    comment: ''
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    noise_type: analog.GR_GAUSSIAN
+    seed: '0'
+    type: complex
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [680, 284.0]
+    rotation: 0
+    state: true
+- name: analog_noise_source_x_0_0
+  id: analog_noise_source_x
+  parameters:
+    affinity: ''
+    alias: ''
+    amp: '0.01'
+    comment: ''
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    noise_type: analog.GR_GAUSSIAN
+    seed: '0'
+    type: complex
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [304, 444.0]
+    rotation: 0
+    state: true
 - name: blocks_add_xx_0
   id: blocks_add_xx
   parameters:
@@ -168,7 +206,43 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [648, 408.0]
+    coordinate: [920, 424.0]
+    rotation: 0
+    state: true
+- name: blocks_add_xx_1
+  id: blocks_add_xx
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    num_inputs: '2'
+    type: complex
+    vlen: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [912, 192.0]
+    rotation: 0
+    state: true
+- name: blocks_add_xx_1_0
+  id: blocks_add_xx
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    num_inputs: '2'
+    type: complex
+    vlen: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [536, 512.0]
     rotation: 0
     state: true
 - name: blocks_multiply_const_vxx_0
@@ -204,7 +278,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [384, 436.0]
+    coordinate: [360, 628.0]
     rotation: 0
     state: true
 - name: blocks_multiply_const_vxx_0_1
@@ -240,7 +314,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [664, 172.0]
+    coordinate: [680, 196.0]
     rotation: 0
     state: true
 - name: blocks_throttle_0
@@ -292,7 +366,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [856, 60.0]
+    coordinate: [1032, 60.0]
     rotation: 0
     state: true
 - name: zeromq_rep_sink_0_0
@@ -311,7 +385,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [856, 156.0]
+    coordinate: [1040, 172.0]
     rotation: 0
     state: true
 - name: zeromq_rep_sink_0_1
@@ -330,7 +404,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [856, 420.0]
+    coordinate: [1048, 420.0]
     rotation: 0
     state: true
 - name: zeromq_req_source_0
@@ -393,16 +467,20 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [128, 420.0]
+    coordinate: [120, 612.0]
     rotation: 0
     state: true
 
 connections:
+- [analog_noise_source_x_0, '0', blocks_add_xx_1, '1']
+- [analog_noise_source_x_0_0, '0', blocks_add_xx_1_0, '0']
 - [blocks_add_xx_0, '0', zeromq_rep_sink_0_1, '0']
+- [blocks_add_xx_1, '0', zeromq_rep_sink_0_0, '0']
+- [blocks_add_xx_1_0, '0', blocks_add_xx_0, '1']
 - [blocks_multiply_const_vxx_0, '0', blocks_add_xx_0, '0']
-- [blocks_multiply_const_vxx_0_0, '0', blocks_add_xx_0, '1']
+- [blocks_multiply_const_vxx_0_0, '0', blocks_add_xx_1_0, '1']
 - [blocks_multiply_const_vxx_0_1, '0', zeromq_rep_sink_0, '0']
-- [blocks_multiply_const_vxx_0_1_1, '0', zeromq_rep_sink_0_0, '0']
+- [blocks_multiply_const_vxx_0_1_1, '0', blocks_add_xx_1, '0']
 - [blocks_throttle_0, '0', blocks_multiply_const_vxx_0_1, '0']
 - [blocks_throttle_0, '0', blocks_multiply_const_vxx_0_1_1, '0']
 - [zeromq_req_source_0, '0', blocks_throttle_0, '0']
