@@ -15,7 +15,7 @@ class MonRcApp(xAppBase):
         self.debug = debug
         self.kpm_queue = queue
         self.e2_node_id = "gnbd_001_001_00019b_0"
-        self.metrics = ["DRB.UEThpDl", "RRU.PrbUsedDl", "NokDl", "McsDl"]
+        self.metrics = ["DRB.UEThpDl", "RRU.PrbUsedDl", "OkDl", "NokDl", "McsDl"]
         # Log for graphs and xApp
         self.log_file = log_file
         self._init_log()
@@ -23,7 +23,7 @@ class MonRcApp(xAppBase):
     def my_subscription_callback(self, e2_agent_id, subscription_id, indication_hdr, indication_msg):
         indication_hdr = self.e2sm_kpm.extract_hdr_info(indication_hdr)
         meas_data = self.e2sm_kpm.extract_meas_data(indication_msg)
-        thp, prbs, mcs, nok = [], [], [], []
+        thp, prbs, mcs, ok, nok = [], [], [], [], []
 
         if self.debug:
             print("\nRIC Indication Received from {} for Subscription ID: {}, KPM Report Style: 4".format(e2_agent_id, subscription_id))
@@ -51,12 +51,14 @@ class MonRcApp(xAppBase):
                         prbs.append(f"{str(value[0])}")
                 elif metric_name == "McsDl":
                         mcs.append(f"{str(value[0])}")
+                elif metric_name == "OkDl":
+                        ok.append(f"{str(value[0])}")
                 elif metric_name == "NokDl":
                         nok.append(f"{str(value[0])}")
-        current = ";".join(thp + prbs + mcs + nok)
+        current = ";".join(thp + prbs + mcs + ok + nok)
         self.kpm_queue.put(current)
         with open(self.log_file, "a") as f:
-            if current != 2 * "0;0;0;0;" + "0":
+            if current != 2 * "0;0;0;0;0;" + "0":
                 f.write(f"{current}\n")
 
     def set_prb(self, ue_id, prb_ratio):
@@ -92,6 +94,7 @@ class MonRcApp(xAppBase):
         header = ['UE0_Throughput', 'UE1_Throughput',
                 'UE0_PRBs_Used', 'UE1_PRBs_Used',
                 'UE0_MCS', 'UE1_MCS',
+                'UE0_OK', 'UE1_OK',
                 'UE0_NOK', 'UE1_NOK']
         with open(self.log_file, 'a') as f:
             h = ';'.join(header)

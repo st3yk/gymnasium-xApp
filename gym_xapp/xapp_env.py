@@ -18,7 +18,7 @@ from datetime import date
 class xAppEnv(gym.Env):
     def __init__(self, xapp: MonRcApp, queue: queue.Queue, n_steps: int):
         super(xAppEnv, self).__init__()
-        self.debug = False
+        self.debug = True
         # DRL Action + State
         self.current_step = 0
         self.n_steps = n_steps
@@ -98,18 +98,21 @@ class xAppEnv(gym.Env):
         if self.debug:
             print(f"Splitted: {splitted}")
         st = np.zeros(self.observation_space.shape, dtype=self.observation_space.dtype)
-        for i in range(len(splitted)):
+        for i in range(len(splitted) - self.ues):
             min_v = 0
-            if i < self.ues: # throughput 0, 1, 2
+            if i < self.ues: # throughput
                 max_v = max_throughput
-            elif i < 2 * self.ues: # prbs 3, 4, 5
+            elif i < 2 * self.ues: # prbs
                 max_v = max_prbs
-            elif i < 3 * self.ues: # mcs 6, 7, 8
+            elif i < 3 * self.ues: # mcs
                 max_v = 28
-            else: # nok 9, 10, 11
-                max_v = 1000
+
             value = float(splitted[i])
-            st[i] = self._normalize(value, min_v, max_v)
+            if i < 3 * self.ues: # thp, prbs, mcs
+                st[i] = self._normalize(value, min_v, max_v)
+            else: # lost packets
+                st[i] = float(splitted[i+2])/float(splitted[i]) if splitted[i] != 0 else 0
+                print(f"{st[i]}% packet lost")
         return st
 
     def _normalize(self, value, min_v, max_v):
@@ -120,6 +123,8 @@ class xAppEnv(gym.Env):
             for ue_id in range(self.ues):
                 self.xapp.set_prb(ue_id, self.prbs[ue_id])
         else:
+            if self.debug:
+                print(f"Applying PRBS: {self.prbs[id]} for UE: {id}")
             self.xapp.set_prb(id, self.prbs[id])
 
     def _jain_fairness(self, throughputs):
@@ -141,9 +146,9 @@ if __name__ == "__main__":
     policy_kwargs = dict(activation_fn=th.nn.ReLU,
                      net_arch=dict(pi=[32, 32], vf=[32, 32]))
     # In the format: Algorithm-ActivationFunction-p<pi layers>-v<vf layers>
-    config_name = 'new-ReLU-p32-32-v32-v32'
+    config_name = 'ReLU-p32-32-v32-v32'
     # Logs
-    log_dir = './runs'
+    log_dir = './update'
     for i in range(1, 100):
         drl_log = f"{log_dir}/{config_name}"
         if i > 1:
@@ -154,7 +159,7 @@ if __name__ == "__main__":
     kpm_log = f"{drl_log}/kpm.log"
     # Create xApp for fetching KPM and setting PRBs
     queue = queue.Queue()
-    xApp = MonRcApp(queue, kpm_log, True)
+    xApp = MonRcApp(queue, kpm_log, False)
     ran_func_id = 2
     xApp.e2sm_kpm.set_ran_func_id(ran_func_id)
     # Connect exit signals

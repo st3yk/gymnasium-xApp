@@ -52,11 +52,10 @@ def main():
         exit()
     grc_proxy.set_ue1_path_loss_db(float(10.0))
     grc_proxy.set_ue2_path_loss_db(float(10.0))
-    grc_proxy.set_ue3_path_loss_db(float(10.0))
 
     ues = {
-        "ue1": {"ip": "10.45.1.2", "bandwidth": "13M"},
-        "ue2": {"ip": "10.45.1.3", "bandwidth": "13M"}
+        "ue1": {"ip": "10.45.1.2", "bandwidth": "14M"},
+        "ue2": {"ip": "10.45.1.3", "bandwidth": "14M"}
     }
     duration = int(input("Set duration in seconds: "))  # Test duration in seconds
     
@@ -67,8 +66,9 @@ def main():
     time.sleep(1)  # Initial delay
     # Start iperf clients for each UE
     clients = {ue: generate_traffic(data["ip"], data["bandwidth"], duration) for ue, data in ues.items()}
-    for i in range(int(duration / 10)):
-        increase_pathloss_for_random_ue(grc_proxy) # Break stuff for 10 seconds (or not)
+    # for i in range(int(duration / 10)):
+    #     increase_pathloss_for_random_ue(grc_proxy) # Break stuff for 10 seconds (or not)
+    time.sleep(duration)
     
     # Retrieve and print results
     for ue, process in clients.items():
