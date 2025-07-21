@@ -29,7 +29,7 @@ tmux send-keys -t $SESSION:4 "cd ${DIR}/srsRAN_4G/build/srsue/src && sudo ./srsu
 # Window 5: Start GNU Radio Companion
 sleep 5
 tmux new-window -t $SESSION -n grc
-tmux send-keys -t $SESSION:5 "QT_QPA_PLATFORM=offscreen python3 ${DIR}/gymnasium-xApp/srsran/multi_ue_scenario.py" C-m
+tmux send-keys -t $SESSION:5 "QT_QPA_PLATFORM=offscreen python3 ${DIR}/gymnasium-xApp/scripts/noise_ue_scenario.py" C-m
 
 # Window 6: Routing test
 sleep 5
