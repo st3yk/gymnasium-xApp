@@ -77,8 +77,8 @@ class MonRcApp(xAppBase):
     # It is required to start the internal msg receive loop.
     @xAppBase.start_function
     def start(self):
-        report_period = 75
-        granul_period = 75
+        report_period = 150
+        granul_period = 150
         # xApp will use E2SM KPM Report Style 4
         # It will store the last state for all of them to return it to the environment when asked
         subscription_callback = lambda agent, sub, hdr, msg: self.my_subscription_callback(agent, sub, hdr, msg)

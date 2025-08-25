@@ -7,7 +7,7 @@ class e2sm_rc_module(object):
     def __init__(self, parent):
         super(e2sm_rc_module, self).__init__()
         self.parent = parent
-        self.ran_func_id = 3;
+        self.ran_func_id = 3
         self.e2sm_rc_compiler = e2sm_rc_packer()
 
         # helper variables

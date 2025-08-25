@@ -119,8 +119,8 @@ class multi_ue_scenario(gr.top_block, Qt.QWidget):
         self.blocks_add_xx_1_0 = blocks.add_vcc(1)
         self.blocks_add_xx_1 = blocks.add_vcc(1)
         self.blocks_add_xx_0 = blocks.add_vcc(1)
-        self.analog_noise_source_x_0_0 = analog.noise_source_c(analog.GR_GAUSSIAN, 0.01, 0)
-        self.analog_noise_source_x_0 = analog.noise_source_c(analog.GR_GAUSSIAN, 0.01, 0)
+        self.analog_noise_source_x_0_0 = analog.noise_source_c(analog.GR_GAUSSIAN, 0.002, 0)
+        self.analog_noise_source_x_0 = analog.noise_source_c(analog.GR_GAUSSIAN, 0.002, 0)
 
 
         ##################################################

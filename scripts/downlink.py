@@ -51,7 +51,7 @@ def main():
         print(f"Error connecting to GNU Radio XMLRPC server: {e}")
         exit()
     grc_proxy.set_ue1_path_loss_db(float(10.0))
-    grc_proxy.set_ue2_path_loss_db(float(10.0))
+    grc_proxy.set_ue2_path_loss_db(float(22.0))
 
     ues = {
         "ue1": {"ip": "10.45.1.2", "bandwidth": "14M"},
