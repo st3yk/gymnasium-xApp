@@ -24,8 +24,8 @@ class xAppEnv(gym.Env):
         self.n_steps = n_steps
         self.observation_space = spaces.Box(low=-1, high=1, shape=(8,), dtype=np.float32)
         self.prb_pairs = np.array([
-            [10, 35], [13, 32], [16, 29], [19, 26],
-            [22, 22], [26, 19], [29, 16], [32, 13], [35, 10]
+            [10, 90], [20, 80], [30, 70], [40, 60], [50, 50],
+            [60, 40], [70, 30], [80, 20], [90, 10],
         ], dtype=np.int32)
         self.action_space = spaces.Discrete(len(self.prb_pairs))
         self.state = np.zeros(8)
@@ -34,11 +34,11 @@ class xAppEnv(gym.Env):
         # Values specific for the use case
         # Got by trial and error, for 10MHz bandwidth
         self.max_throughput = 29712
-        self.max_prbs = 45
+        self.total_prbs = 45
         self.max_packets = 1000
         self.ues = 2
         self.prb_diff = 3
-        self.prbs = [51, 51]
+        self.prbs = [50, 50]
 
         self.xapp = xapp
         self.xapp_thread = threading.Thread(target=self.xapp.start)
@@ -46,7 +46,7 @@ class xAppEnv(gym.Env):
 
     def reset(self, seed=None, options=None):
         self.current_step = 0
-        self.prbs = [22, 22]
+        self.prbs = [50, 50]
         self._apply_prbs()
         self.state = np.zeros(8, dtype=np.float32)
         while not self.kpm_queue.empty():
@@ -71,14 +71,14 @@ class xAppEnv(gym.Env):
         kpms = self.kpm_queue.get()
 
         # Get new state
-        self.state = self._decode_kpms(kpms, self.max_throughput, self.max_prbs)
+        self.state = self._decode_kpms(kpms, self.max_throughput, self.total_prbs)
 
         # Reward: Total Throughput + Jain's Fairness Index
         throughputs = [float(x) for x in kpms.split(';')[:self.ues]]
         r_thp = sum(throughputs) / self.max_throughput
         r_fair = self._jain_fairness(throughputs)
 
-        reward = 0.4 * r_thp + 0.6 * r_fair
+        reward = 0.7 * r_thp + 0.3 * r_fair
 
         if self.debug and self.current_step % 25 == 0:
             print(f"Reward ({reward:.4f}) -> Thp: {r_thp:.4f}, Fairness: {r_fair:.4f}")
@@ -90,7 +90,7 @@ class xAppEnv(gym.Env):
         
         return self.state, reward, done, False, {}
 
-    def _decode_kpms(self, kpms, max_throughput, max_prbs):
+    def _decode_kpms(self, kpms, max_throughput, total_prbs):
         splitted = kpms.split(';')
         if self.debug and self.current_step % 25 == 0:
             print(f"Splitted: {splitted}")
@@ -100,7 +100,7 @@ class xAppEnv(gym.Env):
             if i < self.ues: # throughput
                 max_v = max_throughput
             elif i < 2 * self.ues: # prbs
-                max_v = max_prbs
+                max_v = total_prbs
             elif i < 3 * self.ues: # mcs
                 max_v = 28
 
@@ -133,15 +133,15 @@ class xAppEnv(gym.Env):
     
     def _prb_utilization(self, state):
         total_throughputs = sum(state[:self.ues])
-        return max_prbs * total_throughputs / max_throughput
+        return total_prbs * total_throughputs / max_throughput
 
 if __name__ == "__main__":
     # with granularity period 50, 1000 steps take 50 seconds
     # 150 steps -> 7.5s
     # with 150ms - 1000 steps takes 150 seconds, 2.5min
-    algorithm = "DQN"
-    iterations = 20
-    steps = 256
+    algorithm = "PPO"
+    iterations = 200
+    steps = 512
     # In the format: Algorithm-ActivationFunction-p<pi layers>-v<vf layers>
     config_name = f"{algorithm}-Tanh-p32-32-v32-32"
     # Logs

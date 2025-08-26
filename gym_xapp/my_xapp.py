@@ -67,7 +67,7 @@ class MonRcApp(xAppBase):
         self.e2sm_rc.control_slice_level_prb_quota(
             self.e2_node_id,
             ue_id,
-            min_prb_ratio=1,
+            min_prb_ratio=0,
             max_prb_ratio=max(1,prb_ratio),
             dedicated_prb_ratio=max(1,prb_ratio),
             ack_request=1,
