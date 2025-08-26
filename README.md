@@ -2,7 +2,7 @@
 ## Prerequisites
 This repository includes custom xApp, Docker image and scripts for generating traffic.<br>
 To use it, three repositories are needed:
- - [srsRAN\_Project](https://github.com/srsran/srsRAN_Project), commit: 9d5dd742a70e82c0813c34f57982f9507f1b6d5d
+ - [srsRAN\_Project](https://github.com/srsran/srsRAN_Project), commit: d90cd4e26dba7ad652d16006045eca25ea272315
  - [srsRAN\_4G](https://github.com/srsran/srsRAN_4G), commit: ec29b0c1ff79cebcbe66caa6d6b90778261c42b8
  - [oran-sc-ric](https://github.com/srsran/oran-sc-ric), commit: 1356ee99cec9489acf8906768a7a8c927b07597d
 <br>
