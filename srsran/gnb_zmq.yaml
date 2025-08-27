@@ -41,12 +41,14 @@ cell_cfg:
     prach_config_index: 1           # Sets PRACH config to match what is expected by srsUE
   pdsch:
     mcs_table: qam64
+    min_rb_size: 12                   # was 1; use 12-24 to avoid tiny TBs, UEs do not support them
   pusch:
     mcs_table: qam64
+    min_rb_size: 12                   # was 1
 
 log:
   filename: /tmp/gnb.log            # Path of the log file.
-  all_level: info                   # Logging level applied to all layers.
+  all_level: warning                # Logging level applied to all layers.
   hex_max_size: 0
 
 pcap:
