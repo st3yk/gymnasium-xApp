@@ -14,9 +14,10 @@ from stable_baselines3.common.env_checker import check_env
 from my_xapp import MonRcApp
 from enum import Enum
 from datetime import date
+from collections import Counter
 
 class xAppEnv(gym.Env):
-    def __init__(self, xapp: MonRcApp, queue: queue.Queue, n_steps: int):
+    def __init__(self, xapp: MonRcApp, queue: queue.Queue, n_steps: int, log_dir: str):
         super(xAppEnv, self).__init__()
         self.debug = True
         # DRL Action + State
@@ -24,16 +25,20 @@ class xAppEnv(gym.Env):
         self.n_steps = n_steps
         self.observation_space = spaces.Box(low=-1, high=1, shape=(8,), dtype=np.float32)
         self.prb_pairs = np.array([
-            [10, 90], [20, 80], [30, 70], [40, 60], [50, 50],
-            [60, 40], [70, 30], [80, 20], [90, 10],
+            [20, 40], [25, 35], [30, 30], [35, 25], [40, 20], # Bad choices, sums to 60
+            [30, 70], [40, 60], [50, 50], [60, 40], [70, 30], # Good choices, sums to 100
         ], dtype=np.int32)
         self.action_space = spaces.Discrete(len(self.prb_pairs))
         self.state = np.zeros(8)
         self.kpm_queue = queue
+        self.starting_episode = 1
+        self.current_episode = 0
+        self.log_dir = log_dir
+        self.action_history = Counter({d: 0 for d in range(len(self.prb_pairs))})
 
         # Values specific for the use case
         # Got by trial and error, for 10MHz bandwidth
-        self.max_throughput = 29712
+        self.max_throughput = 32000 #30669
         self.total_prbs = 45
         self.max_packets = 1000
         self.ues = 2
@@ -44,10 +49,25 @@ class xAppEnv(gym.Env):
         self.xapp_thread = threading.Thread(target=self.xapp.start)
         self.xapp_thread.start()
 
+    def _process_actions(self):
+        if self.current_episode != 0 and self.current_episode % 2 == 0:
+            if self.debug:
+                print(f"Updating {self.log_dir}/action.logs")
+                print(self.action_history)
+
+            # Store frequency of actions in a given episode
+            with open(f"{self.log_dir}/actions.log", "a") as f:
+                f.write(f"Episodes {self.starting_episode} -> {self.current_episode}\n")
+                for i in range(len(self.prb_pairs)):
+                    f.write(f" {self.prb_pairs[i]}: {self.action_history.get(i, 0)}\n")
+            self.starting_episode = self.current_episode + 1
+            self.action_history = Counter({d: 0 for d in range(len(self.prb_pairs))})
+
     def reset(self, seed=None, options=None):
         self.current_step = 0
         self.prbs = [50, 50]
         self._apply_prbs()
+        self._process_actions()
         self.state = np.zeros(8, dtype=np.float32)
         while not self.kpm_queue.empty():
             # Clear the queue or we'll perform actions based on slightly older KPMs
@@ -56,6 +76,7 @@ class xAppEnv(gym.Env):
 
     def step(self, action):
         # Action is choosing a pair of prbs and then applying it
+        self.action_history[action] += 1
         if self.prbs != self.prb_pairs[action].tolist():
             self.prbs = self.prb_pairs[action].tolist()
             self._apply_prbs()
@@ -86,6 +107,7 @@ class xAppEnv(gym.Env):
         done = False
         self.current_step += 1
         if self.current_step == self.n_steps:
+            self.current_episode += 1
             done = True
         
         return self.state, reward, done, False, {}
@@ -130,10 +152,6 @@ class xAppEnv(gym.Env):
             return 0.0
         n = len(throughputs)
         return (sum(throughputs) ** 2) / (n * sum(x * x for x in throughputs))
-    
-    def _prb_utilization(self, state):
-        total_throughputs = sum(state[:self.ues])
-        return total_prbs * total_throughputs / max_throughput
 
 if __name__ == "__main__":
     # with granularity period 50, 1000 steps take 50 seconds
@@ -143,7 +161,7 @@ if __name__ == "__main__":
     iterations = 200
     steps = 512
     # In the format: Algorithm-ActivationFunction-p<pi layers>-v<vf layers>
-    config_name = f"{algorithm}-Tanh-p32-32-v32-32"
+    config_name = f"{algorithm}-Tanh-p32x32-v32x32"
     # Logs
     log_dir = './update'
     for i in range(1, 100):
@@ -165,7 +183,7 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, xApp.signal_handler)
 
     # Learning
-    env = xAppEnv(xApp, queue, steps)
+    env = xAppEnv(xApp, queue, steps, drl_log)
     if algorithm == "PPO":
         # PPO Custom actor (pi) and value function (vf) networks
         policy_kwargs = dict(
