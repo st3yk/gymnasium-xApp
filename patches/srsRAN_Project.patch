@@ -109,7 +109,7 @@ index 53aabba0c1..d4cc20c3d5 100644
 +}
 +
 +// Custom OkDl
-+bool e2sm_kpm_du_meas_provider_impl::get_nok_dl(const asn1::e2sm::label_info_list_l        label_info_list,
++bool e2sm_kpm_du_meas_provider_impl::get_ok_dl(const asn1::e2sm::label_info_list_l        label_info_list,
 +                                              const std::vector<asn1::e2sm::ue_id_c>&      ues,
 +                                              const std::optional<asn1::e2sm::cgi_c>       cell_global_id,
 +                                              std::vector<asn1::e2sm::meas_record_item_c>& items)
