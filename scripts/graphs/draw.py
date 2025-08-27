@@ -2,104 +2,119 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Load data
-rr = pd.read_csv("~/lastdance/runs/default/kpm.log", sep=';')
-r2_64 = pd.read_csv("~/lastdance/runs/PPO-ReLU-p64-64-v64-64/kpm.log", sep=';')
-t2_64 = pd.read_csv("~/lastdance/runs/PPO-Tanh-p64-64-v64-64/kpm.log", sep=';')
-windo = 1000
-max_thp = 29712
+# Obscure global variables
+max_thp = 32000
 max_lost = 2000
+windo = 1000
 
-def get_metrics(df, prefix="Throughput"):
-    thps = df[[ col for col in df.columns if "Throughput" in col]]
-    lost = df[[ col for col in df.columns if "NOK" in col ]]
 
-    # Sum of throughputs
-    sum_throughput = thps.sum(axis=1)
-    normalized_throughput = sum_throughput / max_thp
+class Run(object):
+    def __init__(self, label, csv):
+        super().__init__()
+        self.label = label
+        self.df = pd.read_csv(csv, sep=";")
+        self.thps = None
+        self.throughput = None
+        self.jain = None
+        self.reward = None
+        self.lost = None
+        self.set_metrics(self)
 
-    # Sum of lost
-    sum_lost = lost.sum(axis=1)
-    normalized_lost = sum_lost / max_lost
+    def set_metrics(self, prefix="Throughput"):
+        thps = self.df[[col for col in self.df.columns if "Throughput" in col]]
+        lost = self.df[[col for col in self.df.columns if "NOK" in col]]
 
-    # Jain's fairness index
-    numerator = thps.sum(axis=1) ** 2
-    denominator = thps.pow(2).sum(axis=1) * thps.shape[1]
-    jain_index = numerator / denominator
+        # Sum of throughputs
+        sum_throughput = thps.sum(axis=1)
+        normalized_throughput = sum_throughput / max_thp
 
-    reward = 0.4 * normalized_throughput + 0.6 * jain_index
-    print(reward[:5])
+        # Sum of lost
+        sum_lost = lost.sum(axis=1)
+        normalized_lost = sum_lost / max_lost
 
-    return sum_throughput.rolling(window=windo).mean(), jain_index.rolling(window=windo).mean(), reward.rolling(window=windo).mean(), sum_lost
+        # Jain's fairness index
+        numerator = thps.sum(axis=1) ** 2
+        denominator = thps.pow(2).sum(axis=1) * thps.shape[1]
+        jain_index = numerator / denominator
 
-if __name__ == '__main__':
+        reward = 0.4 * normalized_throughput + 0.6 * jain_index
+        print(reward[:5])
+
+        self.throughput = sum_throughput.rolling(window=windo).mean()
+        self.jain = jain_index.rolling(window=windo).mean()
+        self.reward = reward.rolling(window=windo).mean()
+        self.lost = sum_lost
+
+
+runs = [
+    Run("Round Robin", "~/praca/runs/default/kpm.log"),
+    Run("DQN (32x32, Tanh)", "~/praca/runs/DQN-Tanh-32-32/kpm.log"),
+    Run("PPO (p32x32-v32x32, Tanh)", "~/praca/runs/PPO-Tanh-p32-32-v32-32/kpm.log"),
+]
+
+
+if __name__ == "__main__":
     # Compute metrics
-    rr_throughput, rr_jain, rr_reward, rr_lost = get_metrics(rr)
-    r2_64_throughput, r2_64_jain, r2_64_reward, r2_64_lost = get_metrics(r2_64)
-    t2_64_throughput, t2_64_jain, t2_64_reward, t2_64_lost = get_metrics(t2_64)
-
     # Plot 1: Sum Throughput
-    plt.style.use('ggplot') 
+    plt.style.use("ggplot")
     plt.figure(figsize=(20, 10))
     plt.ylim(0, 29712)
-    plt.plot(rr_throughput, label="Round Robin", alpha=0.8)
-    plt.plot(r2_64_throughput, label="PPO-ReLU-p64-64-v64-64", alpha=0.8)
-    plt.plot(t2_64_throughput, label="PPO-Tanh-p64-64-v64-64", alpha=0.8)
-    # plt.plot(ppo1_throughput, label="PPO", alpha=0.8)
-    # plt.plot(a2c1_throughput, label="A2C", alpha=0.8)
-    plt.title(f"Sumaryczna przepustowość w czasie (średnia krocząca, okno = {windo})", fontsize=16)
+    for run in runs:
+        plt.plot(run.throughput, label=run.label, alpha=0.8)
+    plt.title(
+        f"Sumaryczna przepustowość w czasie (średnia krocząca, okno = {windo})",
+        fontsize=16,
+    )
     plt.xlabel("Krok czasowy")
     plt.ylabel("Średnia sumaryczna przepustowość [bps]", fontsize=14)
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig("obrazki/przepustowosc.png", dpi=300, bbox_inches='tight')
+    plt.savefig("obrazki/przepustowosc.png", dpi=300, bbox_inches="tight")
     plt.show()
 
     # Plot 2: Jain's Fairness Index
     plt.figure(figsize=(20, 10))
     plt.ylim(bottom=0)
-    plt.plot(rr_jain, label="Round Robin", alpha=0.8)
-    plt.plot(r2_64_jain, label="PPO-ReLU-p64-64-v64-64", alpha=0.8)
-    plt.plot(t2_64_jain, label="PPO-Tanh-p64-64-v64-64", alpha=0.8)
-    # plt.plot(ppo1_jain, label="PPO", alpha=0.8)
-    # plt.plot(a2c1_jain, label="A2C", alpha=0.8)
-    plt.title(f"Wskaźnik sprawiedliwości Jain’a w czasie (średnia krocząca, okno = {windo})", fontsize=16)
+    for run in runs:
+        plt.plot(run.jain, label=run.label, alpha=0.8)
+    plt.title(
+        f"Wskaźnik sprawiedliwości Jain’a w czasie (średnia krocząca, okno = {windo})",
+        fontsize=16,
+    )
     plt.xlabel("Krok Czasowy")
     plt.ylabel("Średni wskaźnik Jain’a", fontsize=14)
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig("obrazki/jain.png", dpi=300, bbox_inches='tight')
+    plt.savefig("obrazki/jain.png", dpi=300, bbox_inches="tight")
     plt.show()
 
     # Plot 3: Reward
     plt.figure(figsize=(20, 10))
     plt.ylim(bottom=0)
-    plt.plot(rr_reward, label="Round Robin", alpha=0.8)
-    plt.plot(r2_64_reward, label="PPO-ReLU-p64-64-v64-64", alpha=0.8)
-    plt.plot(t2_64_reward, label="PPO-Tanh-p64-64-v64-64", alpha=0.8)
+    for run in runs:
+        plt.plot(run.reward, label=run.label, alpha=0.8)
     plt.title(f"Nagroda w czasie (średnia krocząca, okno = {windo})", fontsize=16)
     plt.xlabel("Krok Czasowy")
-    plt.ylabel(r"Średnia nagroda = $0.4 \cdot T + 0.6 \cdot J$", fontsize=14)
+    plt.ylabel(r"Średnia nagroda = $0.7 \cdot T + 0.3 \cdot J$", fontsize=14)
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig("obrazki/nagroda.png", dpi=300, bbox_inches='tight')
+    plt.savefig("obrazki/nagroda.png", dpi=300, bbox_inches="tight")
     plt.show()
 
     # Plot 4: Sum Lost :(
-    plt.style.use('ggplot') 
+    plt.style.use("ggplot")
     plt.figure(figsize=(20, 10))
     plt.ylim(0, 1000)
-    plt.plot(rr_lost, label="Round Robin", alpha=0.8)
-    plt.plot(r2_64_lost, label="PPO-ReLU-p64-64-v64-64", alpha=0.8)
-    plt.plot(t2_64_lost, label="PPO-Tanh-p64-64-v64-64", alpha=0.8)
+    for run in runs:
+        plt.plot(run.lost, label=run.label, alpha=0.8)
     plt.title(f"Sumaryczna liczba utraconych pakietów w czasie)", fontsize=16)
     plt.xlabel("Krok czasowy")
     plt.ylabel("Liczba utraconych pakietów", fontsize=14)
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig("obrazki/utrata.png", dpi=300, bbox_inches='tight')
+    plt.savefig("obrazki/utrata.png", dpi=300, bbox_inches="tight")
     plt.show()
