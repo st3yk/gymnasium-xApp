@@ -57,7 +57,7 @@ class xAppEnv(gym.Env):
 
             # Store frequency of actions in a given episode
             with open(f"{self.log_dir}/actions.log", "a") as f:
-                f.write(f"Episodes {self.starting_episode} -> {self.current_episode}\n")
+                f.write(f"Epizody {self.starting_episode} -> {self.current_episode}\n")
                 for i in range(len(self.prb_pairs)):
                     f.write(f" {self.prb_pairs[i]}: {self.action_history.get(i, 0)}\n")
             self.starting_episode = self.current_episode + 1
