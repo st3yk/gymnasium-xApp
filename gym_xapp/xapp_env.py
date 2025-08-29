@@ -24,17 +24,14 @@ class xAppEnv(gym.Env):
         self.current_step = 0
         self.n_steps = n_steps
         self.observation_space = spaces.Box(low=-1, high=1, shape=(8,), dtype=np.float32)
-        self.prb_pairs = np.array([
-            [20, 40], [25, 35], [30, 30], [35, 25], [40, 20], # Bad choices, sums to 60
-            [30, 70], [40, 60], [50, 50], [60, 40], [70, 30], # Good choices, sums to 100
-        ], dtype=np.int32)
-        self.action_space = spaces.Discrete(len(self.prb_pairs))
+        self.actions = 70
+        self.action_space = spaces.Discrete(self.actions)
         self.state = np.zeros(8)
         self.kpm_queue = queue
         self.starting_episode = 1
         self.current_episode = 0
         self.log_dir = log_dir
-        self.action_history = Counter({d: 0 for d in range(len(self.prb_pairs))})
+        self.action_history = Counter({d: 0 for d in range(self.actions)})
 
         # Values specific for the use case
         # Got by trial and error, for 10MHz bandwidth
@@ -50,18 +47,17 @@ class xAppEnv(gym.Env):
         self.xapp_thread.start()
 
     def _process_actions(self):
-        if self.current_episode != 0 and self.current_episode % 2 == 0:
+        if self.current_episode != 0 and self.current_episode % 50 == 0:
             if self.debug:
                 print(f"Updating {self.log_dir}/action.logs")
-                print(self.action_history)
 
             # Store frequency of actions in a given episode
             with open(f"{self.log_dir}/actions.log", "a") as f:
                 f.write(f"Episodes {self.starting_episode} -> {self.current_episode}\n")
-                for i in range(len(self.prb_pairs)):
-                    f.write(f" {self.prb_pairs[i]}: {self.action_history.get(i, 0)}\n")
+                for i in range(self.actions):
+                    f.write(f" [{i + 15},{85 - i}]: {self.action_history.get(i, 0)}\n")
             self.starting_episode = self.current_episode + 1
-            self.action_history = Counter({d: 0 for d in range(len(self.prb_pairs))})
+            self.action_history = Counter({d: 0 for d in range(self.actions)})
 
     def reset(self, seed=None, options=None):
         self.current_step = 0
@@ -76,9 +72,11 @@ class xAppEnv(gym.Env):
 
     def step(self, action):
         # Action is choosing a pair of prbs and then applying it
+        action = int(action)
         self.action_history[action] += 1
-        if self.prbs != self.prb_pairs[action].tolist():
-            self.prbs = self.prb_pairs[action].tolist()
+        if self.prbs[0] != action + 15:
+            self.prbs[0] = action + 15
+            self.prbs[1] = 100 - 15 - action # min 15 PRB as max action = 70
             self._apply_prbs()
         if self.debug and self.current_step % 25 == 0:
             print(f"Current prbs: {self.prbs}")
@@ -157,11 +155,11 @@ if __name__ == "__main__":
     # with granularity period 50, 1000 steps take 50 seconds
     # 150 steps -> 7.5s
     # with 150ms - 1000 steps takes 150 seconds, 2.5min
-    algorithm = "PPO"
+    algorithm = "DQN"
     iterations = 200
     steps = 512
     # In the format: Algorithm-ActivationFunction-p<pi layers>-v<vf layers>
-    config_name = f"{algorithm}-Tanh-p32x32-v32x32"
+    config_name = f"{algorithm}-Tanh-128x128"
     # Logs
     log_dir = './update'
     for i in range(1, 100):
@@ -188,14 +186,14 @@ if __name__ == "__main__":
         # PPO Custom actor (pi) and value function (vf) networks
         policy_kwargs = dict(
             activation_fn=th.nn.Tanh,
-            net_arch=dict(pi=[32, 32], vf=[32, 32])
+            net_arch=dict(pi=[64, 64], vf=[64, 64])
         )
         model = PPO(
             policy="MlpPolicy",
             env=env,
             n_steps=steps,
             learning_rate=1e-3,
-            batch_size=32,
+            batch_size=64,
             gamma=0.99,
             verbose=1,
             tensorboard_log=drl_log,
@@ -205,7 +203,7 @@ if __name__ == "__main__":
         # keep the same activation and a comparable network size
         policy_kwargs = dict(
             activation_fn=th.nn.Tanh,
-            net_arch=[32, 32],
+            net_arch=[128, 128],
         )
         model = DQN(
             policy="MlpPolicy",
@@ -213,8 +211,8 @@ if __name__ == "__main__":
             learning_rate=1e-3,
             gamma=0.99,
             batch_size=32,
-            buffer_size=1_000,           # replay buffer
-            learning_starts=1_00,        # warm-up before updates
+            buffer_size=50_000,          # replay buffer
+            learning_starts=1_000,       # warm-up before updates
             train_freq=4,                # update every 4 env steps
             gradient_steps=1,            # 1 gradient step per training call
             target_update_interval=1_000,# sync target net every 1k updates
