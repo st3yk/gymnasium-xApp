@@ -25,6 +25,7 @@ class xAppEnv(gym.Env):
         self.n_steps = n_steps
         self.observation_space = spaces.Box(low=-1, high=1, shape=(8,), dtype=np.float32)
         self.prb_pairs = np.array([
+            [10, 20], [13, 17], [15, 15], [17, 13], [20, 10], # Terrible choices, sums to 30
             [20, 40], [25, 35], [30, 30], [35, 25], [40, 20], # Bad choices, sums to 60
             [30, 70], [40, 60], [50, 50], [60, 40], [70, 30], # Good choices, sums to 100
         ], dtype=np.int32)
@@ -39,7 +40,7 @@ class xAppEnv(gym.Env):
         # Values specific for the use case
         # Got by trial and error, for 10MHz bandwidth
         self.max_throughput = 32000 #30669
-        self.total_prbs = 45
+        self.total_prbs = 44
         self.max_packets = 1000
         self.ues = 2
         self.prb_diff = 3
@@ -50,7 +51,7 @@ class xAppEnv(gym.Env):
         self.xapp_thread.start()
 
     def _process_actions(self):
-        if self.current_episode != 0 and self.current_episode % 2 == 0:
+        if self.current_episode != 0 and self.current_episode % 50 == 0:
             if self.debug:
                 print(f"Updating {self.log_dir}/action.logs")
                 print(self.action_history)
@@ -96,13 +97,15 @@ class xAppEnv(gym.Env):
 
         # Reward: Total Throughput + Jain's Fairness Index
         throughputs = [float(x) for x in kpms.split(';')[:self.ues]]
+        applied_prbs = [int(x) for x in kpms.split(';')[self.ues:2*self.ues]]
         r_thp = sum(throughputs) / self.max_throughput
         r_fair = self._jain_fairness(throughputs)
+        r_prbs = sum(applied_prbs) / self.total_prbs
 
-        reward = 0.7 * r_thp + 0.3 * r_fair
+        reward = 0.8 * r_thp + 0.2 * r_fair
 
         if self.debug and self.current_step % 25 == 0:
-            print(f"Reward ({reward:.4f}) -> Thp: {r_thp:.4f}, Fairness: {r_fair:.4f}")
+            print(f"Reward ({reward:.4f}) -> Thp: {r_thp:.4f}, Fairness: {r_fair:.4f}, PRBs: {r_prbs:.4f} ({applied_prbs})")
 
         done = False
         self.current_step += 1
@@ -157,11 +160,11 @@ if __name__ == "__main__":
     # with granularity period 50, 1000 steps take 50 seconds
     # 150 steps -> 7.5s
     # with 150ms - 1000 steps takes 150 seconds, 2.5min
-    algorithm = "PPO"
+    algorithm = "DQN"
     iterations = 200
     steps = 512
     # In the format: Algorithm-ActivationFunction-p<pi layers>-v<vf layers>
-    config_name = f"{algorithm}-Tanh-p32x32-v32x32"
+    config_name = f"{algorithm}-Tanh-64x64"
     # Logs
     log_dir = './update'
     for i in range(1, 100):
@@ -205,7 +208,7 @@ if __name__ == "__main__":
         # keep the same activation and a comparable network size
         policy_kwargs = dict(
             activation_fn=th.nn.Tanh,
-            net_arch=[32, 32],
+            net_arch=[64, 64],
         )
         model = DQN(
             policy="MlpPolicy",
@@ -213,8 +216,8 @@ if __name__ == "__main__":
             learning_rate=1e-3,
             gamma=0.99,
             batch_size=32,
-            buffer_size=1_000,           # replay buffer
-            learning_starts=1_00,        # warm-up before updates
+            buffer_size=10_000,           # replay buffer
+            learning_starts=1_000,        # warm-up before updates
             train_freq=4,                # update every 4 env steps
             gradient_steps=1,            # 1 gradient step per training call
             target_update_interval=1_000,# sync target net every 1k updates
