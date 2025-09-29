@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 # Obscure global variables
 max_thp = 32000
 max_lost = 2000
-windo = 1000
+max_prbs = 45
+windo = 512
 
 
 class Run(object):
@@ -26,27 +27,34 @@ class Run(object):
 
     def set_metrics(self, prefix="Throughput"):
         thps = self.df[[col for col in self.df.columns if "Throughput" in col]]
+        prbs = self.df[[col for col in self.df.columns if "PRBs" in col]]
         lost = self.df[[col for col in self.df.columns if "NOK" in col]]
+        ok = self.df[[col for col in self.df.columns if "_OK" in col]]
 
         # Sum of throughputs
         sum_throughput = thps.sum(axis=1)
         normalized_throughput = sum_throughput / max_thp
 
+        # Sum of PRBs
+        sum_prbs =prbs.sum(axis=1)
+        normalized_prbs = sum_prbs / max_prbs
+
         # Sum of lost
         sum_lost = lost.sum(axis=1)
-        normalized_lost = sum_lost / max_lost
+        sum_ok = ok.sum(axis=1)
+        lost = 100 * (sum_lost / (sum_lost + sum_ok))
 
         # Jain's fairness index
         numerator = thps.sum(axis=1) ** 2
         denominator = thps.pow(2).sum(axis=1) * thps.shape[1]
         jain_index = numerator / denominator
 
-        reward = 0.4 * normalized_throughput + 0.6 * jain_index
+        reward = 0.8 * normalized_throughput + 0.2 * jain_index
 
         self.throughput = sum_throughput.rolling(window=windo).mean()
         self.jain = jain_index.rolling(window=windo).mean()
         self.reward = reward.rolling(window=windo).mean()
-        self.lost = sum_lost
+        self.lost = lost.rolling(window=windo).mean()
 
     def process_actions(self, actions: str):
         header = ""
@@ -67,8 +75,10 @@ class Run(object):
 
 runs = [
     Run("Round Robin", "/home/tymons/praca/runs/default"),
-    Run("DQN (32x32, Tanh)", "/home/tymons/praca/runs/DQN-Tanh-32x32"),
-    Run("PPO (p32x32-v32x32, Tanh)", "/home/tymons/praca/runs/PPO-Tanh-p32x32-v32x32"),
+    Run("DQN (32x32, ReLU)", "/home/tymons/praca/runs/DQN-ReLU-32x32"),
+    Run("DQN (64x64, ReLU)", "/home/tymons/praca/runs/DQN-ReLU-64x64"),
+    Run("PPO (p32x32-v32x32, ReLU)", "/home/tymons/praca/runs/PPO-ReLU-p32x32-v32x32"),
+    Run("PPO (p64x64-v64x64, ReLU)", "/home/tymons/praca/runs/PPO-ReLU-p64x64-v64x64"),
 ]
 
 
@@ -116,7 +126,7 @@ if __name__ == "__main__":
         plt.plot(run.reward, label=run.label, alpha=0.8)
     plt.title(f"Nagroda w czasie (średnia krocząca, okno = {windo})", fontsize=16)
     plt.xlabel("Krok Czasowy")
-    plt.ylabel(r"Średnia nagroda = $0.7 \cdot T + 0.3 \cdot J$", fontsize=14)
+    plt.ylabel(r"Średnia nagroda = $0.8 \cdot T + 0.2 \cdot J$", fontsize=14)
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
@@ -126,12 +136,12 @@ if __name__ == "__main__":
     # Plot 4: Sum Lost :(
     plt.style.use("ggplot")
     plt.figure(figsize=(20, 10))
-    plt.ylim(0, 1000)
+    plt.ylim(0, 100)
     for run in runs:
         plt.plot(run.lost, label=run.label, alpha=0.8)
-    plt.title(f"Sumaryczna liczba utraconych pakietów w czasie", fontsize=16)
+    plt.title(f"Stosunek straconych pakietów [%] w czasie (średnia krocząca, okno = {windo})", fontsize=16)
     plt.xlabel("Krok czasowy")
-    plt.ylabel("Liczba utraconych pakietów", fontsize=14)
+    plt.ylabel("Średnia liczba utraconych pakietów", fontsize=14)
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
